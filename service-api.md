@@ -46,10 +46,6 @@ You will receive a `client_id` as soon as you have created an account on our ser
 
 In order to verify ownership of the customers having the control over the provided address. The service needs to generate a new `Challenge` and the user needs to sign a freely chosen message which includes the token of `Challenge` with their private key. The chosen message and the result of the sign message needs to be provided in order for us to verify its correctness.
 
-### Affiliation
-
-TODO
-
 ### Challenge
 
 #### Creating a challenge
@@ -124,7 +120,7 @@ A lifetime order representing payment and payout information. You just need to c
   },
   "verification": {
     "message": "I confirm my address. (0ca13mp9ud)",
-    "signature": "<TODO insert sign message>",
+    "signature": "<signed message>",
   }
 }
 ```
@@ -190,7 +186,7 @@ As orders are lifetime for a customer, you will be able to update `affiliateId` 
   "affiliateId": "5dd6139c-18ee-4eb6-b9c5-7de82be5c7bc",
   "verification": {
     "message": "I confirm my address. (0ca13mp9ud)",
-    "signature": "<TODO insert sign message>",
+    "signature": "<signed message>",
   }
 }
 ```
@@ -299,7 +295,7 @@ There are two different ways on how to retrieve operations.
 
 #### Receiving orders for a customer
 
-In order to identify and be able to retrieve all operations for a customer - address, a custom message and its signature will be needed. Due to GET those parameters need to be provided as query parameters.
+In order to identify the customer and be able to retrieve all operations for a customer - address, a custom message and its signature will be needed. Due to GET those parameters need to be provided as query parameters.
 
 <details>
  <summary><code>GET</code> <code><b>/v1/operations</b></code></summary>
@@ -416,7 +412,7 @@ In order to identify and be able to retrieve all operations for a customer - add
 
 #### Receiving orders for an order
 
-In order to identify and be able to retrieve operations for an order - address, a custom message and its signature will be needed. Due to GET those parameters need to be provided as query parameters.
+In order to identify the customer and be able to retrieve operations for an order - address, a custom message and its signature will be needed. Due to GET those parameters need to be provided as query parameters.
 
 <details>
  <summary><code>GET</code> <code><b>/v1/orders/{id}/operations</b></code></summary>
@@ -432,5 +428,222 @@ In order to identify and be able to retrieve operations for an order - address, 
 > | name      |  type     | data type               | description                                                           |
 > |-----------|-----------|-------------------------|-----------------------------------------------------------------------|
 > | address      |  required | string   | address of the customer  |
-> | message      |  required | string   | custom message containing a challenge  |
+> | message      |  required | string   | custom message containing a challenge |
 > | signature      |  required | string   | signature of the provided message  |
+
+</details>
+
+### Payment requests
+
+You are able to create a more typical payment process. This request can be handled in crypto, in fiat or in a mix of both. To be able to create a new payment, you will need to verify that you are the owner of the receiving address and you will need a verification of the actual user, who is buying.
+
+Those verification objects are the same as in all our other endpoints consisting of address, message and signature. This means that for this call you will need two distinct challenges.
+
+A callback URL needs to be provided, where we will post updates via HTTP requests.
+
+The actual payment request needs to be defined in fiat currency and can be further specified by providing a defined split with percentages. Currently we would only support 100% ADA. In future you will be able to provide your split whatever it shall be - 80/20, 60/40 and so on...
+
+#### Creating a payment request
+
+<details>
+ <summary><code>POST</code> <code><b>/v1/payment-requests</b></code></summary>
+
+##### Request body
+
+```javascript
+{
+  "active": true,
+  "callbackUrl": "https://your.callback.url.service/",
+  "payment": {
+    "currency": "eur",
+    "userIban": "DE43500105174745259888"
+  },
+  "receiver": {
+    "address": "<receiver address>",
+    "message": "I confirm my address. (2apjrxlyqa)",
+    "signature": "<signed message>",
+  },
+  "requests": {
+    "amount": 800,
+    "currency": "eur",
+    "split": {
+      "ada": 1,
+      "fiat": 0
+    }
+  },
+  "verification": {
+    "address": "<user address",
+    "message": "I confirm my address. (0ca13mp9ud)",
+    "signature": "<signed message>",
+  }
+}
+```
+
+##### Response
+
+```javascript
+{
+  "id": "bd221687-0e8e-41d4-868c-e2d878e3024e",
+  "active": true,
+  "createdAt": "2023-11-09T04:36:55.111Z",
+  "updatedAt": "2023-11-09T04:36:55.111Z",
+  "status": "initiated",
+  "paymentFiat": {
+    "currency": "eur",
+    "userIban": "DE43500105174745259888"
+    "purpose": "",
+    "iban": "",
+    "bankName": "",
+    "bankStreet": "",
+    "bankPostalCode": "",
+    "bankTown": "",
+    "bankCountry": "",
+    "bic": "",
+    "name": "Rampy",
+    "street": "",
+    "postalCode": "",
+    "town": "",
+    "country": "",
+  },
+  "paymentCrypto": {
+    "address": "<receiver address>",
+    "amount": 1333,
+    "token": "ada"
+  }
+  "payout": {
+    "address": "<user address>",
+  }
+}
+```
+
+*Info: empty properties are unknown at the moment.*
+
+</details>
+
+#### Receiving a payment request
+
+In order to identify the client and be able to retrieve initiated payment requests - address, a custom message and its signature will be needed. Due to GET those parameters need to be provided as query parameters.
+
+Possible status of a payment request
+> | status      |  description     |
+> |-----------|-----------|
+> | initiated      |  created and waiting for the user to complete the payment     |
+> | processing      |  payment received and callback URL called     |
+> | error      |  something has gone wrong and client got informed via callback URL     |
+> | completed      |  client has completed their part of the transaction     |
+
+<details>
+ <summary><code>GET</code> <code><b>/v1/payment-requests/{id}</b></code></summary>
+
+##### URL parameter
+
+> | name      |  type     | data type               | description                                                           |
+> |-----------|-----------|-------------------------|-----------------------------------------------------------------------|
+> | id      |  required | guid   | id of a payment request  |
+
+##### Query parameter
+
+> | name      |  type     | data type               | description                                                           |
+> |-----------|-----------|-------------------------|-----------------------------------------------------------------------|
+> | address      |  required | string   | address of the customer  |
+> | message      |  required | string   | custom message containing a challenge |
+> | signature      |  required | string   | signature of the provided message  |
+
+##### Response
+
+```javascript
+[{
+  "id": "bd221687-0e8e-41d4-868c-e2d878e3024e",
+  "active": true,
+  "createdAt": "2023-11-09T04:36:55.111Z",
+  "updatedAt": "2023-11-09T04:36:55.111Z",
+  "status": "processing",
+  "paymentFiat": {
+    "currency": "eur",
+    "userIban": "DE43500105174745259888"
+    "purpose": "",
+    "iban": "",
+    "bankName": "",
+    "bankStreet": "",
+    "bankPostalCode": "",
+    "bankTown": "",
+    "bankCountry": "",
+    "bic": "",
+    "name": "Rampy",
+    "street": "",
+    "postalCode": "",
+    "town": "",
+    "country": "",
+  },
+  "paymentCrypto": {
+    "address": "<receiver address>",
+    "amount": 1333,
+    "token": "ada"
+  }
+  "payout": {
+    "address": "<user address>",
+  }
+}]
+```
+
+*Info: empty properties are unknown at the moment.*
+
+</details>
+
+#### Completing a payment request
+
+As soon as a payment request has its status updated to processing. We will call the associated callback URL with needed information. This information is currently TBD.
+
+A payment request in status processing can be marked as completed, after the client has finished their process, which actually completes the payment transaction.
+
+<details>
+ <summary><code>POST</code> <code><b>/v1/payment-requests/{id}/complete</b></code></summary>
+
+##### Request body
+
+```javascript
+{
+  "receiver": {
+    "address": "<receiver address>",
+    "message": "I confirm my address. (2apjrxlyqa)",
+    "signature": "<signed message>",
+  }
+}
+```
+
+##### Response
+
+```javascript
+{
+  "id": "bd221687-0e8e-41d4-868c-e2d878e3024e",
+  "active": true,
+  "createdAt": "2023-11-09T04:36:55.111Z",
+  "updatedAt": "2023-11-09T04:36:55.111Z",
+  "status": "completed",
+  "paymentFiat": {
+    "currency": "eur",
+    "userIban": "DE43500105174745259888"
+    "purpose": "",
+    "iban": "",
+    "bankName": "",
+    "bankStreet": "",
+    "bankPostalCode": "",
+    "bankTown": "",
+    "bankCountry": "",
+    "bic": "",
+    "name": "Rampy",
+    "street": "",
+    "postalCode": "",
+    "town": "",
+    "country": "",
+  },
+  "paymentCrypto": {
+    "address": "<receiver address>",
+    "amount": 1333,
+    "token": "ada"
+  }
+  "payout": {
+    "address": "<user address>",
+  }
+}
+```
